@@ -100,6 +100,8 @@ export function Reports() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [month, setMonth] = useState(now.getMonth());
   const [year, setYear] = useState(now.getFullYear());
+  const [folderStatus, setFolderStatus] = useState("");
+  const [folderError, setFolderError] = useState("");
 
   useEffect(() => {
     fetch("/api/receipts")
@@ -146,10 +148,30 @@ export function Reports() {
     (best, item) => (item.total > best.total ? item : best),
     monthly[0],
   );
-  const filename =
+  const reportName =
     view === "monthly"
-      ? `receipt-report-${year}-${String(month + 1).padStart(2, "0")}.csv`
-      : `receipt-report-${year}.csv`;
+      ? `receipt-report-${year}-${String(month + 1).padStart(2, "0")}`
+      : `receipt-report-${year}`;
+
+  async function downloadFolder() {
+    if (!period.length || folderStatus) return;
+    setFolderError("");
+    setFolderStatus("Preparing receipts…");
+    try {
+      const { downloadReceiptFolder } = await import(
+        "@/lib/reports/export-folder"
+      );
+      await downloadReceiptFolder(period, reportName, setFolderStatus);
+    } catch (error) {
+      setFolderError(
+        error instanceof Error
+          ? error.message
+          : "The receipt folder could not be created.",
+      );
+    } finally {
+      setFolderStatus("");
+    }
+  }
 
   return (
     <div>
@@ -202,12 +224,20 @@ export function Reports() {
           </div>
           <button
             className="button secondary export-button"
-            onClick={() => downloadReportCsv(period, filename)}
+            onClick={() => downloadReportCsv(period, `${reportName}.csv`)}
           >
             ↓ Export CSV
           </button>
+          <button
+            className="button primary export-button"
+            onClick={downloadFolder}
+            disabled={!period.length || !!folderStatus}
+          >
+            {folderStatus || "↓ Download Receipt Folder"}
+          </button>
         </div>
       </div>
+      {folderError && <div className="notice error">{folderError}</div>}
       <section className="report-hero">
         <p>
           {view === "monthly"
